@@ -27,8 +27,8 @@ Step-by-Step Installation and Setup:
 
 4. Deploy the contract:
 
-   * Create a deploy script (e.g., `scripts/deploy.js`)
-   * Deploy it with: `npx hardhat run scripts/deploy.js --network arbitrumSepolia`
+   * Create a deploy script (e.g., `ignition/modules/deploy.js`)
+   * Deploy it with: `npx hardhat ignition deploy ./ignition/modules/deploy.js --network arbSepolia`
    * Save the deployed contract address in `.env` as `VITE_CONTRACT_ADDRESS`
 
 5. Create a frontend project:
@@ -56,7 +56,7 @@ Step-by-Step Installation and Setup:
      * `VITE_CONTRACT_ADDRESS=your_deployed_contract_address`
      * `VITE_LIGHTHOUSE_API_KEY=your_lighthouse_api_key`
 
-8. Create a file named `abi.js`:
+8. Create a file named `abi.json`:
 
    * Export your smart contract ABI from Hardhat
 
