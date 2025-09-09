@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import lighthouse from "@lighthouse-web3/sdk";
 import { ethers } from "ethers";
+import UserFiles from "../component/UserFiles.jsx";
 import ABI from "./abi.json";
 
 const API_KEY = import.meta.env.VITE_LIGHTHOUSE_API_KEY;
@@ -9,8 +10,12 @@ const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
 export default function App() {
 
   const [wallet, setWallet] = useState(null);
+
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
+
+  const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState("");
 
   const connectWallet = async () => {
 
@@ -18,8 +23,12 @@ export default function App() {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const accounts = await provider.send("eth_requestAccounts", []);
 
+      if (accounts.length === 0)
+        throw new Error("No accounts returned from Wallet.");
+
       setWallet(accounts[0]);
       loadUserFiles(accounts[0], provider);
+
     } else {
       alert("MetaMask not found");
     }
@@ -32,51 +41,117 @@ export default function App() {
 
     const formatted = files.map((f) => ({
       name: f.fileName,
-      url: `https://gateway.lighthouse.storage/ipfs/${f.cid}`,
+      cid: f.cid,
       timestamp: new Date(Number(f.timestamp) * 1000).toLocaleString(),
     }));
 
     setUploadedFiles(formatted);
+
   };
 
   const handleFileChange = (e) => {
     setSelectedFile(e.target.files[0]);
   };
 
-  const uploadToIPFS = async () => {
+  const signAuthMessage = async () => {
 
-    if (!selectedFile || !wallet)
-      return alert("Connect wallet and select file");
+    if (window.ethereum) {
+      try {
+        const signerAddress = wallet;
+        const { message } = (await lighthouse.getAuthMessage(signerAddress))
+          .data;
+
+        const signature = await window.ethereum.request({
+          method: "personal_sign",
+          params: [message, signerAddress],
+        });
+
+        return { signature, signerAddress };
+
+      } catch (error) {
+        console.error("Error signing message with Wallet", error);
+        return null;
+      }
+    } else {
+      console.log("Please install Wallet!");
+      return null;
+    }
+
+  };
+
+  const progressCallback = (progressData) => {
+
+    const percentage = (
+      (progressData.uploaded / progressData.total) *
+      100
+    ).toFixed(2);
+
+    setProgress(percentage);
+    setStatus(`Uploading... ${percentage}%`);
+
+  };
+
+  const uploadEncryptedFile = async () => {
+    if (!selectedFile) return alert("No file selected.");
 
     try {
-      const output = await lighthouse.upload([selectedFile], API_KEY);
-      const cid = output.data.Hash;
+      setStatus("Starting upload...");
+      setProgress(0);
+
+      const encryptionAuth = await signAuthMessage();
+      if (!encryptionAuth) return;
+
+      setProgress(30);
+
+      const { signature, signerAddress } = encryptionAuth;
+
+      setProgress(50);
+
+      const output = await lighthouse.uploadEncrypted(
+        [selectedFile],
+        API_KEY,
+        signerAddress,
+        signature,
+        progressCallback
+      );
+
+      setProgress(60);
+
+      const cid = output.data[0].Hash;
+
+      setProgress(70);
 
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
 
+      setProgress(80);
+
       const tx = await contract.uploadFile(cid, selectedFile.name);
       await tx.wait();
 
+      setProgress(90);
+
       loadUserFiles(wallet, provider);
+      setStatus("Upload complete ✅");
+
+      setProgress(100);
+
       setSelectedFile(null);
     } catch (error) {
-      console.error("Upload failed:", error);
-      alert("Upload failed. See console.");
+      console.error("Error uploading encrypted file:", error);
+      setStatus("Upload failed ❌");
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-100 p-8 font-sans">
       <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-6">
-
         <h2 className="text-2xl font-bold text-center mb-4">
           📁 Decentralized File Uploader
         </h2>
 
         <div className="flex flex-col items-center space-y-4">
-
           <button
             onClick={connectWallet}
             className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
@@ -89,63 +164,34 @@ export default function App() {
           <input
             type="file"
             onChange={handleFileChange}
-            className="text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            className="text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 
+                       file:rounded-full file:border-0 file:text-sm 
+                       file:font-semibold file:bg-blue-50 file:text-blue-700 
+                       hover:file:bg-blue-100"
           />
 
           <button
-            onClick={uploadToIPFS}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+            onClick={uploadEncryptedFile}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition disabled:opacity-50"
+            disabled={!selectedFile}
           >
             ⬆ Upload & Save to Blockchain
           </button>
 
-        </div>
-
-        <div className="mt-8">
-
-          <h3 className="text-lg font-semibold mb-2">📦 Your Uploaded Files</h3>
-
-          {uploadedFiles.length === 0 ? (
-            <p className="text-gray-500 text-sm">No files uploaded yet.</p>
-          ) : (
-            <ul className="space-y-2">
-
-              {uploadedFiles.map((file, index) => (
-                <li
-                  key={index}
-                  className="bg-gray-50 p-3 rounded shadow flex justify-between items-center"
-                >
-                  <div>
-
-                    <a
-                      href={file.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline font-medium"
-                    >
-                      {file.name}
-                    </a>
-
-                    <div className="text-xs text-gray-500">
-                      {file.timestamp}
-                    </div>
-
-                  </div>
-
-                  <a
-                    href={file.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded"
-                  >
-                    View
-                  </a>
-                  
-                </li>
-              ))}
-            </ul>
+          {status && (
+            <div className="w-full mt-4">
+              <p className="text-center text-sm mb-2">{status}</p>
+              <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                <div
+                  className="bg-blue-500 h-4 transition-all duration-200 ease-in-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
           )}
         </div>
+
+        <UserFiles UFiles={uploadedFiles} />
       </div>
     </div>
   );
