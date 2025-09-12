@@ -1,9 +1,19 @@
 import { useState } from "react";
 import lighthouse from "@lighthouse-web3/sdk";
 import { ethers } from "ethers";
+import ABI from "../src/abiV2.json";
+import axios from "axios";
 
-const UserFiles = ({UFiles}) => {
+const API_KEY = import.meta.env.VITE_LIGHTHOUSE_API_KEY;
+const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
 
+const UserFiles = ({
+  uploadedFiles,
+  setUploadedFiles,
+  wallet,
+  setProgress,
+  setStatus,
+}) => {
   const [decryptedFiles, setDecryptedFiles] = useState({});
 
   const encryptionSignature = async () => {
@@ -52,21 +62,93 @@ const UserFiles = ({UFiles}) => {
     }
   };
 
+  const getUploads = async () => {
+    try {
+      const response = await lighthouse.getUploads(API_KEY, null);
+
+      const filesInfo = response.data.fileList;
+
+      return filesInfo;
+    } catch (err) {
+      console.error("Error : " + err);
+    }
+  };
+
+  const deleteFile = async (cid) => {
+    try {
+      setStatus("Starting delete...");
+      setProgress(0);
+
+      const filesInfo = await getUploads();
+
+      setProgress(40);
+
+      const fileToDelete = filesInfo.find((file) => file.cid === cid);
+
+      if (!fileToDelete) {
+        alert("File not found in your uploads list.");
+        return;
+      }
+
+      setProgress(55);
+
+      const url = `https://api.lighthouse.storage/api/user/delete_file?id=${fileToDelete.id}`;
+      const response = await axios.delete(url, {
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+        },
+      });
+
+      setProgress(70);
+
+      // delete from smart contract
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+      setProgress(80);
+
+      const fileExists = await contract.fileExists(wallet, cid);
+
+      if (fileExists) {
+        const tx = await contract.deleteFile(cid);
+        await tx.wait();
+
+        setProgress(100);
+        setStatus("Delete complete ✅");
+
+        setUploadedFiles((prevFiles) => prevFiles.filter((f) => f.cid !== cid));
+
+        alert(`File with CID ${cid} deleted successfully`);
+        setStatus("");
+      } else {
+        setStatus("Delete failed ❌");
+        alert("File not exists on chain...");
+        setStatus("");
+      }
+    } catch (error) {
+      console.error("Error deleting file:", error);
+      setStatus("Delete failed ❌");
+      alert("Error deleting file...");
+      setStatus("");
+    }
+  };
+
   return (
     <div className="mt-8">
       <h3 className="text-lg font-semibold mb-2">📦 Your Uploaded Files</h3>
-      {UFiles.length === 0 ? (
+      {uploadedFiles.length === 0 ? (
         <p className="text-gray-500 text-sm">No files uploaded yet.</p>
       ) : (
         <ul className="space-y-2">
-          {UFiles.map((file, index) => (
+          {uploadedFiles.map((file) => (
             <li
-              key={index}
+              key={file.cid}
               className="bg-gray-50 p-3 rounded shadow flex flex-col space-y-2"
             >
               <div className="flex justify-between items-center">
                 <div>
-                  <span className="text-blue-600 font-medium">{file.name}</span>
+                  <div className="text-blue-600 font-medium">{file.name}</div>
                   <div className="text-xs text-gray-500">{file.timestamp}</div>
                 </div>
 
@@ -76,6 +158,13 @@ const UserFiles = ({UFiles}) => {
                     className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded cursor-pointer"
                   >
                     Decrypt
+                  </button>
+
+                  <button
+                    onClick={() => deleteFile(file.cid)}
+                    className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded cursor-pointer"
+                  >
+                    Delete
                   </button>
 
                   {decryptedFiles[file.cid] && (
