@@ -146,7 +146,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-100 p-8 font-sans">
       <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-6">
         <h2 className="text-2xl font-bold text-center mb-4">
-          📁 Decentralized File Uploader
+          File Uploader
         </h2>
 
         <div className="flex flex-col items-center space-y-4">
@@ -156,7 +156,7 @@ export default function App() {
           >
             {wallet
               ? `Connected: ${wallet.slice(0, 6)}...${wallet.slice(-4)}`
-              : "🔌 Connect Wallet"}
+              : " Connect Wallet"}
           </button>
 
           <input
@@ -172,7 +172,7 @@ export default function App() {
             onClick={uploadEncryptedFile}
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition disabled:opacity-50"
           >
-            ⬆ Upload
+            Upload
           </button>
 
           {status && (

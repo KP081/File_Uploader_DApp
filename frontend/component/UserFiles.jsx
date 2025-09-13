@@ -3,6 +3,7 @@ import lighthouse from "@lighthouse-web3/sdk";
 import { ethers } from "ethers";
 import ABI from "../src/abiV2.json";
 import axios from "axios";
+import { Search } from "lucide-react";
 
 const API_KEY = import.meta.env.VITE_LIGHTHOUSE_API_KEY;
 const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
@@ -15,6 +16,13 @@ const UserFiles = ({
   setStatus,
 }) => {
   const [decryptedFiles, setDecryptedFiles] = useState({});
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredFiles = uploadedFiles.filter(
+    (file) =>
+      file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      file.cid.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const encryptionSignature = async () => {
     if (!window.ethereum) {
@@ -136,12 +144,23 @@ const UserFiles = ({
 
   return (
     <div className="mt-8">
-      <h3 className="text-lg font-semibold mb-2">📦 Your Uploaded Files</h3>
-      {uploadedFiles.length === 0 ? (
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
+        <input
+          type="text"
+          placeholder="Search by name or CID..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-10 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+      </div>
+
+      <h3 className="text-lg font-semibold mb-2">Your Uploaded Files</h3>
+      {filteredFiles.length === 0 ? (
         <p className="text-gray-500 text-sm">No files uploaded yet.</p>
       ) : (
         <ul className="space-y-2">
-          {uploadedFiles.map((file) => (
+          {filteredFiles.map((file) => (
             <li
               key={file.cid}
               className="bg-gray-50 p-3 rounded shadow flex flex-col space-y-2"
@@ -170,6 +189,8 @@ const UserFiles = ({
                   {decryptedFiles[file.cid] && (
                     <a
                       href={decryptedFiles[file.cid].url}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       download={decryptedFiles[file.cid].name}
                       className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded flex items-center"
                     >
