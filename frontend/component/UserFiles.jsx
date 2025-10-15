@@ -83,7 +83,6 @@ const UserFiles = ({
 
       alert(`Click Download!!!`);
       setStatus("");
-
     } catch (err) {
       console.error("Decryption failed:", err);
       setStatus("Decryption failed ❌");
@@ -149,7 +148,7 @@ const UserFiles = ({
 
         setUploadedFiles((prevFiles) => prevFiles.filter((f) => f.cid !== cid));
 
-        alert(`File with CID ${cid} deleted successfully`);
+        alert(`File deleted successfully`);
         setStatus("");
       } else {
         setStatus("Delete failed ❌");
@@ -194,12 +193,14 @@ const UserFiles = ({
                 </div>
 
                 <div className="flex space-x-2">
-                  <button
-                    onClick={() => decrypt(file)}
-                    className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded cursor-pointer"
-                  >
-                    Decrypt
-                  </button>
+                  {!decryptedFiles[file.cid] && (
+                    <button
+                      onClick={() => decrypt(file)}
+                      className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded cursor-pointer"
+                    >
+                      Decrypt
+                    </button>
+                  )}
 
                   <button
                     onClick={() => deleteFile(file.cid)}
