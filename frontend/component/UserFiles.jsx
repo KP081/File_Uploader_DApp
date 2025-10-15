@@ -42,7 +42,12 @@ const UserFiles = ({
 
   const decrypt = async (file) => {
     try {
+      setStatus("Starting decryption...");
+      setProgress(0);
+
       const { publicKey, signedMessage } = await encryptionSignature();
+
+      setProgress(50);
 
       const keyObject = await lighthouse.fetchEncryptionKey(
         file.cid,
@@ -50,8 +55,12 @@ const UserFiles = ({
         signedMessage
       );
 
+      setProgress(60);
+
       const metadata = await lighthouse.getFileInfo(file.cid);
       const fileType = metadata?.mimeType || "application/octet-stream";
+
+      setProgress(70);
 
       const decrypted = await lighthouse.decryptFile(
         file.cid,
@@ -59,14 +68,27 @@ const UserFiles = ({
         fileType
       );
 
+      setProgress(85);
+
       const url = URL.createObjectURL(decrypted);
+
+      setProgress(95);
 
       setDecryptedFiles((prev) => ({
         ...prev,
         [file.cid]: { url, name: file.name },
       }));
+      setProgress(100);
+      setStatus("Decryption complete ✅");
+
+      alert(`Click Download!!!`);
+      setStatus("");
+
     } catch (err) {
       console.error("Decryption failed:", err);
+      setStatus("Decryption failed ❌");
+      alert("Error Decryption file...");
+      setStatus("");
     }
   };
 
@@ -131,13 +153,13 @@ const UserFiles = ({
         setStatus("");
       } else {
         setStatus("Delete failed ❌");
-        alert("File not exists on chain...");
+        alert("File not exists on chain!!!");
         setStatus("");
       }
     } catch (error) {
       console.error("Error deleting file:", error);
       setStatus("Delete failed ❌");
-      alert("Error deleting file...");
+      alert("Error deleting file!!!");
       setStatus("");
     }
   };
